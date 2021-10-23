@@ -1,0 +1,20 @@
+User: kbasedemo2
+Provider: Gsheets
+Transfer: Globus
+
+Sheets:
+  TokenFile: ./secrets/kbase-gcp-7ae5d8a46ffe.json
+  Workbook: Concierge Example
+  Study: Study
+  Samples: Samples
+  Data:
+    metagenome: Data:Metagenomes
+
+Globus:
+  # NMDC
+  SourceEndpoint: 72dd396a-2242-11ec-a0a4-6b21ca6daf73
+  # KBase Endpoint (do not change)
+  DestinationEndpoint: c3c0a65f-5827-4834-b6c9-388b0b19953a
+  ClientId: a5f78945-0459-4339-94ba-3e68e00b011e
+  TokenFile: ./secrets/kbasedemo-tokens.json
+

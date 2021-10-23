@@ -1,0 +1,74 @@
+# KBase Specific Configuration
+# Should not need to modify
+Global:
+  service_url: https://kbase.us/services
+  auth_url: https://kbase.us/services/auth
+  staging_url: https://kbase.us/services/staging_service
+  ws_url: https://kbase.us/services/ws
+  sample_service_url: https://kbase.us/services/sampleservice
+  ee2_url: https://kbase.us/services/ee2-nr
+  nms_url: https://kbase.us/services/narrative_method_store/rpc
+
+
+Apps:
+  kb_uploadmethods/import_gff_fasta_as_metagenome_from_staging: 
+    batch_name: gff_metagenome
+    file_params: 
+    - fasta_file
+    - gff_file
+    filePaths:
+    - fasta_file
+    - genome_name
+    - gff_file
+    outputParamIds:
+    - genome_name
+    params:
+      generate_missing_genes: 1
+      genetic_code: null
+      release: ""
+      source: Other
+  # Future
+  samples_uploader/import_samples:
+    params:
+      sample_file: {samples_fn}
+      file_format: {tmpl}
+      set_name: {sampleset}
+      header_row_index: None
+      name_field: ""
+      description: {name}
+      sample_set_ref: None
+      output_format: ""
+      taxonomy_source: n/a
+      num_otus: 20
+      incl_seq: 0
+      otu_prefix: OTU
+      incl_input_in_output: 1
+      share_within_workspace: 1
+      prevalidate: 1
+      keep_existing_samples: 1
+      ignore_warnings: 0
+      workspace_name: {workspace_name}
+      workspace_id: {wsid}
+
+
+# TODO Merge this and the above
+Imports:
+  metagenome:
+    name: genome_name
+    Method: kb_uploadmethods.upload_metagenome_fasta_gff_file
+    AppId: kb_uploadmethods/import_gff_fasta_as_metagenome_from_staging
+    default_params:
+      generate_missing_genes: 1
+      genetic_code:
+      release: ""
+      source: Other
+    Files:
+        Assembly:
+          param_name: fasta_file
+        GFF:
+          param_name: gff_file
+
+Linking:
+  metagenome:
+    exts:
+     - .assembly 
