@@ -80,8 +80,9 @@ class GsheetProvider():
         # data = ws.get()
         # TODO: Allow mapping
         samples = []
+        name = headers[0]
         for sample_data in g_samples:
-            samples.append(Sample(sample_data, )) 
+            samples.append(Sample(sample_data, name_col=name))
         return headers, samples
 
 #    def _add_transport(self, obj):
@@ -102,9 +103,10 @@ class GsheetProvider():
         return objs
 
     def get_formatting(self, spreadsheet, sheet):
+        # TODO: Make it figure out the range automatically
         resp = spreadsheet.fetch_sheet_metadata({
                   'includeGridData': True,
-                  'ranges': ["%s!A1:Z200" % (sheet)],
+                  'ranges': ["%s!A1:Z3000" % (sheet)],
                   'fields': 'sheets.data.rowData.values.effectiveFormat'
                })
         return resp['sheets'][0]['data'][0]['rowData']

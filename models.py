@@ -34,6 +34,8 @@ class Study:
         self.narrative_id = None
         self.narrative_ref = None
 
+        # Dataset blank 
+        self.dataset = "None currently available"
 
     def set_dataset(self, ds_doi, ds_title, ds_url):
         self.ds_doi = ds_doi
@@ -48,8 +50,7 @@ class Study:
 
 class File:
     """
-    File Object: This captures important information about an
-    NMDC file.
+    File Object: This captures important information about a file param
 
     Variables:
     fn: File name
@@ -57,17 +58,9 @@ class File:
     url: data url
     """
 
-    #def __init__(self, fn, access_method, url=None, src=None, endpt=None, clientid=None):
-    def __init__(self, fn):
+    def __init__(self, fn, src=None):
         self.fn = fn
-#        self.access_method = access_method
-#        # Used for Globus
-##        self.src = src
-#        self.src_endpt = endpt
-#        self.clientid = clientid
-#
-#        # Used for URL staging
-#        self.url = url
+        self.src = src
         self.update_callback = None
 
 class DataObject:
@@ -86,7 +79,7 @@ class DataObject:
         self.method = self.conf['Method']
         self.appid = self.conf["AppId"]
         for k, v in self.conf['default_params'].items():
-            params[k] = v
+            self.params[k] = v
         self.files = []
         self._process_files(params)
         self.update_callback = None
@@ -97,11 +90,7 @@ class DataObject:
         for ft, ftp in fts.items():
             fp = params[ft]
             fn = fp.split('/')[-1]
-#            am = params['Access Method']
-#            endpt = params['SourceEndpoint']
-#            clientid = params['ClientId']
-#            fo = File(fn, am, src=fp, endpt=endpt)
-            fo = File(fn)
+            fo = File(fn, src=fp)
             self.files.append(fo)
             self.params[ftp['param_name']] = fn
 
@@ -110,10 +99,9 @@ class Sample:
     """
     Sample Object to hold workspace object information.
     """
-    def __init__(self, data):
+    def __init__(self, data, name_col="name"):
         self.update_callback = None
         self.data = data
-        self.name = data['name']
+        self.name = data[name_col]
         self.kbaseid = None
-
 

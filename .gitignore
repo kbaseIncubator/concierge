@@ -1,4 +1,5 @@
 secrets/
+private/
 __pycache__/
 *.pyc
 debug*

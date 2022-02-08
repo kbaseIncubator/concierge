@@ -1,6 +1,7 @@
 User: kbasedemo2
 Provider: Gsheets
 Transfer: Globus
+TokenFile: ./secrets/kbasedemon-kbase-token
 
 Sheets:
   TokenFile: ./secrets/kbase-gcp-7ae5d8a46ffe.json
@@ -9,6 +10,8 @@ Sheets:
   Samples: Samples
   Data:
     metagenome: Data:Metagenomes
+    metagenome_assembly: Data:MetagenomeAssemblies
+    MAGs: Data:MAGs
 
 Globus:
   # NMDC

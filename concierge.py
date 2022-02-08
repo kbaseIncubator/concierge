@@ -9,7 +9,6 @@ from narrative_utils import NarrativeUtils
 from yaml import load, Loader
 from uuid import uuid4
 from time import time
-from datetime import datetime
 
 _DEBUG = os.environ.get("DEBUG")
 
@@ -28,38 +27,77 @@ class Concierge:
     create a narrative and manage its contents.
     """
     config = load(open("concierge.yaml").read(), Loader=Loader)
+    globalconf = config['Global']
     _staging = config['Global']['staging_url']
-    ws = Workspace(config['Global']['ws_url'])
-    auth = config['Global']['auth_url']
-    ss = SampleService(config['Global']['sample_service_url'])
-    ee = execution_engine2(config['Global']['ee2_url'])
-    nu = NarrativeUtils()
+    auth_url = config['Global']['auth_url']
 
     dryrun = os.environ.get('DRYRUN')
+    skip_samples = os.environ.get('SKIP_SAMPLES')
 
-    def __init__(self, study, transfer=None):
+    def __init__(self, study, transfer=None, token=None, statefile=None):
         """
         study: Study Object
         """
         self.study = study
-        self.headers = {"Authorization": os.environ["KB_AUTH_TOKEN"]}
+        if token:
+            self.token = token
+        else:
+            self.token = os.environ["KB_AUTH_TOKEN"]
+        self.headers = {"Authorization": self.token}
+        self.ws = Workspace(self.globalconf['ws_url'], token=token)
+        self.ss = SampleService(self.globalconf['sample_service_url'], token=token)
+        self.ee = execution_engine2(self.globalconf['ee2_url'], token=token)
+        self.nu = NarrativeUtils(token=token)
         # Get the username
-        resp = requests.get('%s/me' % (self.auth), headers=self.headers).json()
+        resp = requests.get('%s/me' % (self.auth_url), headers=self.headers).json()
         self.user = resp['user']
         self.transfer = transfer
+        self.statefile = statefile
+        self.submitted_transfers = {}
+        self.submitted_imports = {}
 
+    def read_state(self):
+        if self.statefile:
+            md = json.load(open(self.statefile))
+            self.submitted_transfers = md["submitted_transfers"]
+            self.submitted_imports = md["submitted_imports"]
+
+    def write_state(self):
+        if self.statefile:
+            obj = {
+                   "submitted_imports": self.submitted_imports,
+                   "submitted_transfers": self.submitted_transfers
+                  }
+            json.dump(obj, open(self.statefile, "w"), indent=2)
+ 
+ 
     def sync(self):
         """
         This will be the main driver function to synchronize content
         """
+        self.read_state()
         self.initialize_narrative()
         # TODO Add way to detect if samples need updating
         update_samples = False
-        if update_samples:
+        ss_exist = self.check_sample_set()
+        if (update_samples or not ss_exist) and not self.skip_samples:
             self.make_samples()
             self.submit_sample_import()
         self.find_new_data()
-        self.link_objects()
+        # TODO: Make an option for this.
+        if not self.skip_samples:
+            _debug("Linking")
+            self.link_objects()
+        self.write_state()
+
+    def check_sample_set(self):
+        """
+        Check if there is a sample set file
+        """
+        done = {}
+        for obj in self.ws.list_objects({'ids': [self.study.wsid]}):
+            done[obj[1]] = 1
+        return self.study.sampleset in done
 
     def make_samples(self):
         """
@@ -91,6 +129,8 @@ class Concierge:
         """
 
         # TODO: Use the config for this.
+        if self.study.sampleset in self.submitted_imports:
+            return
         fn = "%s.tsv" % (self.study.id)
         params = {
             "sample_file": fn,
@@ -121,6 +161,7 @@ class Concierge:
             "wsid": self.study.wsid
         }
         job_id = self.submit_app(rpc)
+        self.submitted_imports[self.study.sampleset] = job_id
         self.add_app_cell(job_id)
 
     def submit_app(self, param):
@@ -142,6 +183,8 @@ class Concierge:
         the job ID. It constructs the state and parameters from EE2 and NMS.
         Input: job_id
         """
+        if self.dryrun:
+            return
         cell = self.nu.create_app_cell(job_id)
         ref = self.study.narrative_ref
         self.nu.append_cell(cell, ref)
@@ -167,6 +210,7 @@ class Concierge:
         """
 
         url = "%s/list" % (self._staging)
+        _debug("Fetching staged files")
         resp = requests.get(url, headers=self.headers)
         if resp.status_code != 200:
             sys.write.stderr(resp.text + '\n')
@@ -191,27 +235,38 @@ class Concierge:
         # Now let's go through the samples and see what's missing
         missing = []
         for sample in self.study.data_objects:
+            if sample.name in self.submitted_imports:
+                continue
             if sample.name not in done:
                 missing.append(sample)
 
         staged = self.get_staged_files()
         to_stage = []
         to_import = []
+        pending_transfers = 0
         for item in missing:
             ready = True
             for fo in item.files:
+     
                 if fo.fn not in staged:
                     ready = False
-                    print("Staging %s" % (fo.src))
-                    to_stage.append(fo.src)
+                    if fo.src not in self.submitted_transfers:
+                        print("Staging %s" % (fo.src))
+                        to_stage.append(fo.src)
+                    else:
+                        pending_transfers += 1
 
             if ready:
                 item.staged = True
-                print("Import %s" % (item.name))
+                _debug("Import %s" % (item.name))
                 to_import.append(item)
         # TODO: Some way to see what is in flight
-        if len(to_stage) > 0:
+        if len(to_stage) > 0 and pending_transfers == 0:
+            print("Staging %d files" % (len(to_stage)))
             self.transfer.transfer(to_stage)
+            now = time()
+            for src in to_stage:
+                self.submitted_transfers[src] = now 
 
         self.submit_import(to_import)
 
@@ -222,6 +277,7 @@ class Concierge:
         if len(to_import) == 0:
             print("Nothing to import")
             return
+        print("Import %d Objects" % (len(to_import)))
         cell_id = str(uuid4())
         run_id = str(uuid4())
         job_meta = {"cell_id": cell_id, "run_id": run_id}
@@ -251,8 +307,11 @@ class Concierge:
             return
         resp = self.ee.run_job_batch(plist, bp)
         job_id = resp['batch_id']
+
         _debug(cell_id)
         _debug(job_id)
+        for obj in to_import:
+             self.submitted_imports[obj.name] = job_id
         cell = self.nu.create_bulk_import_app_cell(job_id)
         ref = self.study.narrative_ref
         self.nu.append_cell(cell, ref)
@@ -348,9 +407,12 @@ class Concierge:
 
     def _add_citation(self):
         metadata = self.ws.get_workspace_info({"id": self.study.wsid})[8]
-        metadata['data_citation_URL'] = self.study.ds_url
-        metadata['data_citation_DOI'] = self.study.ds_doi
-        metadata['data_citation_title'] = self.study.ds_title
+        if self.study.ds_url:
+            metadata['data_citation_URL'] = self.study.ds_url
+        if self.study.ds_doi:
+            metadata['data_citation_DOI'] = self.study.ds_doi
+        if self.study.ds_title:
+            metadata['data_citation_title'] = self.study.ds_title
         self.ws.alter_workspace_metadata({"wsi": {"id": self.study.wsid}, 'new': metadata})
 
     def initialize_narrative(self):
@@ -374,7 +436,7 @@ class Concierge:
             print("Previously Initialized %d" % (self.study.wsid))
             return
         except:
-            print("Add")
+            print("Add %s" % (ws_name))
         markdown = self.generate_markdown_header()
         resp = self.ws.create_workspace({"workspace": ws_name})
         self.study.wsid = resp[0]

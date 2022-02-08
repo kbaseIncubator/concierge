@@ -2,8 +2,10 @@ from installed_clients.workspaceClient import Workspace
 from installed_clients.execution_engine2Client import execution_engine2
 from installed_clients.NarrativeMethodStoreClient import NarrativeMethodStore
 from yaml import load, Loader
+from time import time
 import os
 import json
+from datetime import datetime
 
 _DEBUG = os.environ.get("DEBUG")
 
@@ -15,13 +17,16 @@ def _debug_json(obj):
 
 class NarrativeUtils:
     config = load(open("concierge.yaml").read(), Loader=Loader)
-    ws = Workspace(config['Global']['ws_url'])
-    ee = execution_engine2(config['Global']['ee2_url'])
-    nms = NarrativeMethodStore(config['Global']['nms_url'])
+    globalconf = config['Global']
     _EXEC_FIELDS = ['batch_id', 'batch_job', 'created', 'child_jobs', 'job_id',
                     'queued', 'retry_count', 'retry_ids', 'retry_saved_toggle',
                     'status', 'updated', 'user', 'wsid']
     dryrun = os.environ.get('DRYRUN')
+
+    def __init__(self, token=None):
+        self.ws = Workspace(self.globalconf['ws_url'], token=token)
+        self.ee = execution_engine2(self.globalconf['ee2_url'], token=token)
+        self.nms = NarrativeMethodStore(self.globalconf['nms_url'], token=token)
 
     def create_bulk_import_app_cell(self, job_id):
         """
@@ -96,10 +101,10 @@ class NarrativeUtils:
 
         # Build up the app chunk
         app = {
-            "fileParamIds": fileParamIds, # TODO
-            "otherParamIds": otherParamIds, # TODO
-            "outputParamIds": outputParamIds, # TODO
-            "specs": specs, # TODO
+            "fileParamIds": fileParamIds,
+            "otherParamIds": otherParamIds,
+            "outputParamIds": outputParamIds,
+            "specs": specs,
             "tag": "release"
         }
         # TODO: Make the state look at the options
@@ -143,69 +148,6 @@ class NarrativeUtils:
           }
         _debug_json(cell)
         return cell
-
-    #DEPRECATE
-    def add_batch_cell(self, to_import, cell_id, run_id, job_id):
-        """
-        Append a batch input cell to the narrative.
-        This requires:
-        - the list of samples to import
-        - The cell ID
-        - The run ID (not used yet)
-        - The job ID for the parent job.
-        """
-
-        # TODO: Try to generate everything from EE2 and NMS
-        cell = json.load(open('bulk_import.json'))
-        # TODO run_id
-        cell['metadata']['kbase']['attributes']['id'] = cell_id
-
-        flist = []
-        fpaths = []
-        for item in to_import:
-            # build params
-            for fo in item.files:
-                flist.append(fo.fn)
-            fpaths.append(item.params)
-        blk = cell['metadata']['kbase']['bulkImportCell']
-        blk['inputs']['gff_metagenome']['files'] = flist
-        blk['params']['gff_metagenome']['filePaths'] = fpaths
-        blk['exec']['jobs'] = {'byId': {}}
-        js = self.ee.check_job({'job_id': job_id})
-        job_list = js['child_jobs']
-        job_list.append(job_id)
-        jobs = self.ee.check_jobs({'job_ids': job_list})["job_states"]
-        job_by_id = dict()
-        # TODO: Can we just use the output from check_jobs?
-        for job in jobs:
-            job_by_id[job['job_id']] = job
-        for job in job_list:
-            jr = job_by_id[job]
-            rec = {}
-            rec['cell_id'] = cell_id
-            for f in self._EXEC_FIELDS:
-                if f in jr:
-                    rec[f] = jr[f]
-            rec['job_output'] = jr.get('job_output', {})
-            blk['exec']['jobs']['byId'][job] = rec
-            if job == job_id:
-                jstate = rec
-        blk['exec']['jobState'] = jstate
-        ref = self.study.narrative_ref
-        resp = self.ws.get_objects2({"objects": [{"ref": ref}]})
-        narr = resp['data'][0]
-        usermeta = narr['info'][10]
-        narrdata = narr['data']
-        narrdata['cells'].append(cell)
-        obj = {
-            "objid": self.study.narrative_id,
-            "type": "KBaseNarrative.Narrative-4.0",
-            "data": narrdata,
-            "meta": usermeta
-            }
-        if _DEBUG:
-            json.dump(cell, open('debug.json', 'w'), indent=2)
-        resp = self.ws.save_objects({"id": self.study.wsid, "objects": [obj]})
 
     def create_app_cell(self, job_id):
         """

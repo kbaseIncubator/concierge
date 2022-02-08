@@ -11,6 +11,7 @@ import json
 import sys
 import time
 import webbrowser
+import os
 
 from globus_sdk import NativeAppAuthClient, RefreshTokenAuthorizer, TransferClient
 from globus_sdk.exc import GlobusAPIError

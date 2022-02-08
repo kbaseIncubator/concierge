@@ -1,0 +1,29 @@
+Global:
+  URL: https://data.dev.microbiomedata.org/
+  Mapping:
+    name: id
+    description: name
+    latitude: latitude
+    longitude: longitude
+    biome: env_broad_scale_id
+    feature: env_local_scale_id
+    material: env_medium_id
+    "gold:study_id": study_id
+    depth_bgs: depth
+    collection_date: collection_date
+    "gold:ecosystem":  ecosystem
+    "gold:ecosystem_category": ecosystem_category
+    "gold:ecosystem_type": ecosystem_type
+    "gold:ecosystem_subtype": ecosystem_subtype
+    "gold:specific_ecosystem": specific_ecosystem
+    "gold:biosample_id": id
+  
+  Problematic_ENVO_Feature_Terms:
+  - ENVO:01000941
+  - ENVO:02500027
+  - ENVO:01001209
+  - ENVO:00003074
+  Problematic_ENVO_Material_Terms:
+  - ENVO:01001869
+  - ENVO:04000007
+  - PO:0009007

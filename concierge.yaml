@@ -6,10 +6,11 @@ Global:
   staging_url: https://kbase.us/services/staging_service
   ws_url: https://kbase.us/services/ws
   sample_service_url: https://kbase.us/services/sampleservice
-  ee2_url: https://kbase.us/services/ee2-nr
+  ee2_url: https://kbase.us/services/ee2
   nms_url: https://kbase.us/services/narrative_method_store/rpc
 
 
+# This is used to render the various app cells
 Apps:
   kb_uploadmethods/import_gff_fasta_as_metagenome_from_staging: 
     batch_name: gff_metagenome
@@ -27,6 +28,34 @@ Apps:
       genetic_code: null
       release: ""
       source: Other
+  kb_uploadmethods/import_fasta_as_assembly_from_staging:
+    batch_name: assembly
+    file_params: 
+    - staging_file_subdir_path
+    filePaths:
+    - staging_file_subdir_path
+    - assembly_name
+    outputParamIds:
+    - assembly_name
+    params:
+      min_contig_length: 500
+      type: metagenome
+  kb_uploadmethods/import_genbank_as_genome_from_staging:
+    batch_name: genbank_genome
+    file_params: 
+    - staging_file_subdir_path
+    filePaths:
+    - staging_file_subdir_path
+    - genome_name
+    outputParamIds:
+    - genome_name
+    params:
+      source: Other
+      release: ""
+      genetic_code: null
+      scientific_name: ""
+      generate_ids_if_needed: 1
+      generate_missing_genes: 1
   # Future
   samples_uploader/import_samples:
     params:
@@ -67,6 +96,43 @@ Imports:
           param_name: fasta_file
         GFF:
           param_name: gff_file
+
+  metagenome_assembly:
+    name: assembly_name
+    Method: kb_uploadmethods.import_fasta_as_assembly_from_staging
+    AppId: kb_uploadmethods/import_fasta_as_assembly_from_staging
+    default_params:
+      min_contig_length: 500
+      type: metagenome
+    Files:
+        Assembly:
+          param_name: staging_file_subdir_path
+
+  MAGs:
+    name: assembly_name
+    Method: kb_uploadmethods.import_fasta_as_assembly_from_staging
+    AppId: kb_uploadmethods/import_fasta_as_assembly_from_staging
+    default_params:
+      min_contig_length: 500
+      type: mag
+    Files:
+        Assembly:
+          param_name: staging_file_subdir_path
+
+  MAGs_gbk:
+    name: genome_name
+    Method: kb_uploadmethods.import_genbank_from_staging
+    AppId: kb_uploadmethods/import_genbank_as_genome_from_staging
+    default_params:
+      source: Other
+      release: ""
+      genetic_code: null
+      scientific_name: ""
+      generate_ids_if_needed: 1
+      generate_missing_genes: 1
+    Files:
+        GBK:
+          param_name: staging_file_subdir_path
 
 Linking:
   metagenome:

@@ -52,7 +52,9 @@ class GlobusTransfer:
         transfer = TransferClient(authorizer=authorizer)
 
         try:
+            print("Activiating src %s" % (self.src_endpt))
             transfer.endpoint_autoactivate(self.src_endpt)
+            print("Activiating dest %s" % (self.dest_endpt))
             transfer.endpoint_autoactivate(self.dest_endpt)
         except GlobusAPIError as ex:
             print(ex)
